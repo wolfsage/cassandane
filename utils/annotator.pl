@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 #  Copyright (c) 2011 Opera Software Australia Pty. Ltd.  All rights
 #  reserved.

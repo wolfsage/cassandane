@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 #
 #  Copyright (c) 2011-2018 FastMail Pty Ltd. All rights reserved.
 #

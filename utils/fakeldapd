@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 # A little ldif-driven ldap server
 #
 # Based somewhat on Net::LDAP::Server::Test, which didn't do the
