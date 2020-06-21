@@ -59,6 +59,8 @@ set_verbose(1) if $ENV{CASSANDANE_VERBOSE};
 sigprocmask(SIG_UNBLOCK, POSIX::SigSet->new( &POSIX::SIGQUIT ))
     or die "Cannot unblock SIGQUIT: $!";
 
+warn "ANNOT\n";
+my $x = 0;
 my %commands =
 (
     set_shared_annotation => sub
@@ -116,10 +118,25 @@ sub annotate_message
     seek $fh, $message->bodystructure()->{Offset}, 0
         or die "Cannot seek in message: $!";
 
+    xlog "readlining\n";
+
+    my $hasvcard;
     while (my $line = readline $fh)
     {
         chomp $line;
+        xlog "line: $line\n";
+        if ($line =~ /VCARD/) {
+          $hasvcard = 1;
+        }
+    }
+    if ($hasvcard) {
+      $message->set_shared_annotation('/comment', 'shared.value' . $x++);
+        xlog "ANNOTATING OKAY YEAH\n";
+    }
+
+    if (0) { my $line;
         my @a = split /\s+/, $line;
+        xlog "cmd: $commands{$a[0]}: @a";
         my $cmd = $commands{$a[0]}
             or die "Unknown command $a[0]";
         shift(@a);

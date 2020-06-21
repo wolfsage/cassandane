@@ -617,6 +617,7 @@ sub _jmap_setup
     };
     if ($@) {
         my $e = $@;
+ warn "WTF: $@\n";
         $self->tear_down();
         die $e;
     }

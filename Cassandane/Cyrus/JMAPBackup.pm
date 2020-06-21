@@ -40,6 +40,8 @@
 package Cassandane::Cyrus::JMAPBackup;
 use strict;
 use warnings;
+use Cwd qw(abs_path);
+
 use DateTime;
 use JSON::XS;
 use Net::CalDAVTalk 0.09;
@@ -56,6 +58,26 @@ use Cassandane::Util::Log;
 
 use charnames ':full';
 
+sub start_my_instances
+{
+    my ($self) = @_;
+
+    $self->{instance}->add_generic_daemon(
+        name => 'annotator',
+        port => $self->{instance}->{config}->get('annotation_callout'),
+        argv => sub {
+            my ($daemon) = @_;
+            return (
+                abs_path('utils/annotator.pl'),
+                '--port', $daemon->port(),
+                '--pidfile', '@basedir@/run/annotator.pid',
+                );
+        });
+
+    $self->_start_instances();
+}
+
+
 sub new
 {
     my ($class, @args) = @_;
@@ -67,9 +89,12 @@ sub new
                  httpmodules => 'carddav caldav jmap',
                  httpallowcompress => 'no',
                  notesmailbox => 'Notes',
-                 jmap_nonstandard_extensions => 'yes');
+                 jmap_nonstandard_extensions => 'yes',
+                 annotation_callout => '@basedir@/conf/socket/annotator.sock',
+   );
 
     return $class->SUPER::new({
+        start_instances => 0,
         config => $config,
         jmap => 1,
         adminstore => 1,
@@ -81,6 +106,9 @@ sub set_up
 {
     my ($self) = @_;
     $self->SUPER::set_up();
+    $self->start_my_instances();
+
+    $self->_jmap_setup();
     $self->{jmap}->DefaultUsing([
         'urn:ietf:params:jmap:core',
         'urn:ietf:params:jmap:mail',
@@ -252,10 +280,15 @@ sub test_restore_contacts_all
     sleep 2;
     xlog "create contacts";
     my $res = $jmap->CallMethods([['Contact/set', {create => {
-                        "a" => {firstName => "a", lastName => "a"},
-                        "b" => {firstName => "b", lastName => "b"},
-                        "c" => {firstName => "c", lastName => "c"},
-                        "d" => {firstName => "d", lastName => "d"}
+                        "a" => {firstName => "a", lastName => "a", },
+                        "b" => {firstName => "b", lastName => "b",  },
+                        "c" => {firstName => "c", lastName => "c",  },
+                        "d" => {firstName => "d", lastName => "d", }
+
+#                        "a" => {firstName => "a", lastName => "a", importance => 1, },
+#                        "b" => {firstName => "b", lastName => "b", importance => 0, },
+#                        "c" => {firstName => "c", lastName => "c", importance => 1, },
+#                        "d" => {firstName => "d", lastName => "d", importance => 0, }
                     }}, "R1"]]);
     $self->assert_not_null($res);
     $self->assert_str_equals('Contact/set', $res->[0][0]);
@@ -265,14 +298,21 @@ sub test_restore_contacts_all
     my $contactC = $res->[0][1]{created}{"c"}{id};
     my $contactD = $res->[0][1]{created}{"d"}{id};
 
+    sleep 2;
+
     xlog "destroy contact A, update contact B";
     $res = $jmap->CallMethods([['Contact/set', {
-                    destroy => [$contactA],
-                    update => {$contactB => {firstName => "B"}}
+                    destroy => [$contactA, $contactB, $contactC, $contactD],
                 }, "R2"]]);
     $self->assert_not_null($res);
     $self->assert_str_equals('Contact/set', $res->[0][0]);
     $self->assert_str_equals('R2', $res->[0][2]);
+
+    xlog "restore contacts prior to most recent changes";
+    $res = $jmap->CallMethods([['Backup/restoreContacts', {
+                    undoPeriod => "PT2S",
+                    undoAll => JSON::true
+                }, "R5"]]);
 
     xlog "get contacts";
     $res = $jmap->CallMethods([
@@ -305,7 +345,7 @@ sub test_restore_contacts_all
 
     xlog "restore contacts prior to most recent changes";
     $res = $jmap->CallMethods([['Backup/restoreContacts', {
-                    undoPeriod => "PT1S",
+                    undoPeriod => "PT2S",
                     undoAll => JSON::true
                 }, "R5"]]);
     $self->assert_not_null($res);
